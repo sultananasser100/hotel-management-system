@@ -31,6 +31,13 @@ endpoint).
   has a tool that writes to the database. Any mutating request becomes a structured "proposed
   action" that the UI shows as a confirmation dialog; confirming it calls the same Server Action
   the manual UI uses. Introduced in Phase 14.
+- **Application shell:** shadcn's `sidebar` block (`src/components/ui/sidebar.tsx`) wrapping
+  `src/app/(dashboard)/layout.tsx`; nav items (`src/lib/nav.ts`) are filtered with the same
+  `can()` used everywhere else, and every page under `(dashboard)` also calls
+  `requirePermission()`/`requireRole()` itself — the sidebar hiding a link is a UX nicety, never
+  the actual access control. Prisma enums used by Client Components (e.g. the sidebar) must import
+  from `@/generated/prisma/enums`, never `@/generated/prisma/client` — see `DECISIONS.md`.
+  Introduced in Phase 4.
 
 ## Full plan
 

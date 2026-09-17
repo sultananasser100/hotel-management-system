@@ -116,3 +116,59 @@ the page doesn't exist yet); an authenticated session visiting `/login` is redir
 yet (that's Phase 15) — verification here exercised the underlying Auth.js endpoints directly. No
 `/staff` or `/settings` pages exist yet (later phases); the role-only route list in
 `permissions.ts` is forward-looking infrastructure, demonstrated via the proxy redirect test above.
+
+## Phase 4 — Application shell (sidebar, header, navigation)
+
+**Goal:** replace the Phase 3 placeholder dashboard with the real shell — sidebar, header, user
+menu, role-aware nav — without building any actual feature pages.
+
+**What was done:**
+
+- Added shadcn's `sidebar` block (pulls in `sheet`, `tooltip`, `skeleton`, and a `use-mobile` hook
+  — all source components, zero new npm dependencies; confirmed via `shadcn view sidebar` before
+  installing). Declined to overwrite the 3 already-customized files it also touches
+  (`button`, `separator`, `input`).
+- `src/lib/nav.ts` — the 12-item nav structure, each entry tagged with its `Resource` from
+  `permissions.ts` so visibility can never drift from the permission matrix.
+- `src/components/layout/app-sidebar.tsx`, `site-header.tsx`, `user-menu.tsx` — the shell chrome.
+  Nav items are filtered with the existing `can(role, resource, "view")`; no new permission logic.
+- `src/lib/session.ts` gained `requirePermission(resource, action?)`, a thin composition over the
+  existing `requireUser()`/`can()` — used by every placeholder page below so role restrictions are
+  enforced authoritatively server-side, not just by hiding the nav link.
+- `src/app/(dashboard)/layout.tsx` — the shared shell (`SidebarProvider` + `AppSidebar` +
+  `SidebarInset` + `SiteHeader`), reading the `sidebar_state` cookie server-side so the
+  expanded/collapsed state is correct on first paint.
+- 10 placeholder pages (`rooms`, `room-types`, `guests`, `reservations`, `checkin-checkout`,
+  `payments`, `housekeeping`, `staff`, `reports`, `notifications`, `settings`) using a shared
+  `<PlaceholderPage>` component — no feature logic, just proves every visible nav link resolves.
+- `src/app/(dashboard)/dashboard/page.tsx` trimmed to a minimal welcome message (identity/sign-out
+  now live in the header's user menu). Root `layout.tsx` got real metadata, a global `<Toaster />`,
+  and `<TooltipProvider>` (required by the sidebar's collapsed-state tooltips).
+
+**Real issue found and fixed (see `DECISIONS.md`):** a Client Component transitively importing
+`Role` from the generated Prisma client's main module (rather than its lightweight `enums.ts`)
+broke the production build entirely — Turbopack tried to bundle Prisma's Node-only runtime for the
+browser. Fixed across all 4 affected files.
+
+**Also fixed in passing:** the shadcn-generated `use-mobile.ts` hook violated
+`react-hooks/set-state-in-effect` (calls `setState` synchronously inside a `useEffect` body) —
+rewritten to use a lazy `useState` initializer instead, since it's now our own copied/owned code
+per the Phase 1 decision to vendor shadcn components rather than depend on them as a package.
+
+**Verification:** `tsc --noEmit`, `npm run lint`, `npm run build` all pass. Manually tested against
+the dev server with all 3 seeded roles: ADMIN sees all 12 nav items, RECEPTIONIST sees 10 (no
+Staff/Settings), HOUSEKEEPING sees 4 (Dashboard/Rooms/Housekeeping/Notifications) — exact match to
+the permission matrix. `/login` renders with zero sidebar/`SidebarProvider` markup. Unauthenticated
+`/guests` redirects to `/login`; a HOUSEKEEPING session hitting `/guests` (not proxy-restricted,
+only page-level `requirePermission` covers it) redirects to `/dashboard` — confirmed via the
+`NEXT_REDIRECT` stack trace naming `requirePermission`/`GuestsPage`, proving the authoritative
+check (not just nav-hiding) is what caught it. ADMIN now gets real 200 pages at `/staff` and
+`/settings` (were 404 in Phase 3); RECEPTIONIST/HOUSEKEEPING get redirected before reaching them.
+Sign-out was re-verified against the new call site specifically (a `DropdownMenuItem onSelect`
+calling the Server Action directly, not a form) by extracting its action ID from Next's
+server-reference manifest and invoking it directly — confirmed session cookie cleared and the
+`x-action-redirect` to `/login` issued.
+
+**Not done in this phase (by design):** no actual Rooms/Guests/Reservations/etc. functionality —
+all 10 non-dashboard pages are placeholders per the approved scope. Theme toggle deferred to
+Phase 17 per the earlier decision.

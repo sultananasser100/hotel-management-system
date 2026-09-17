@@ -1,4 +1,8 @@
-import { Role } from "@/generated/prisma/client";
+// Import from enums.ts, not client.ts — this module is reachable from
+// Client Components (via app-sidebar.tsx), and client.ts pulls in Prisma's
+// Node-only runtime (node:process/path/url, the query engine), which breaks
+// the browser build. enums.ts is a plain data module made for this.
+import { Role } from "@/generated/prisma/enums";
 
 /**
  * Role/permission matrix from the approved architecture plan (docs/ARCHITECTURE.md).
