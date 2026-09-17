@@ -67,3 +67,52 @@ correctly; `npm run build` and `npm run lint` both pass.
 **Not done in this phase (by design):** the Postgres `EXCLUDE`-constraint-based double-booking
 guard is deferred to the hardening phase, per the approved plan — Phase 2 only adds the supporting
 indexes.
+
+## Phase 3 — Auth.js setup with role-based access
+
+**Goal:** working login/logout against the seeded users, JWT sessions carrying role, an optimistic
+route-protection layer, and an authoritative server-side check — no Phase 4 UI shell yet.
+
+**What was done:**
+
+- Installed `next-auth@5.0.0-beta.32` (exact pin) — its peer deps explicitly support Next 16.3.5 /
+  React 19.2.8; no adapter package needed (Credentials + JWT doesn't persist sessions to the DB,
+  so no schema changes).
+- `src/lib/auth.ts` — NextAuth config: `Credentials` provider (`authorize()` checks `isActive`,
+  verifies password with `bcrypt.compare`, updates `lastLoginAt`), `session: { strategy: "jwt" }`,
+  `jwt`/`session` callbacks carrying `id`/`role` onto the token/session, and an `authorized`
+  callback that redirects unauthenticated users to `/login`, authenticated users away from
+  `/login`, and non-matching roles away from role-only route prefixes.
+- `src/lib/permissions.ts` — the role/resource matrix from the architecture plan, plus
+  `ROLE_ONLY_ROUTE_PREFIXES` (currently `/staff`, `/settings` → `ADMIN`).
+- `src/lib/session.ts` — `requireUser()`/`requireRole()`, the authoritative server-side check for
+  Server Components/Actions/Route Handlers (per Next.js's own recommended DAL pattern).
+- `src/types/next-auth.d.ts` — module augmentation adding `id`/`role` to `Session`/`User`/`JWT`.
+- `src/app/api/auth/[...nextauth]/route.ts`, `src/lib/actions/auth.ts` (`loginAction`,
+  `logoutAction`), `src/app/(auth)/login/{page,login-form}.tsx`,
+  `src/app/(dashboard)/dashboard/page.tsx` (intentionally minimal placeholder), `src/app/page.tsx`
+  now redirects to `/dashboard`.
+- `src/proxy.ts` — Next.js 16's `middleware.ts` successor; just re-exports the wrapped `auth`
+  function as `proxy`, all logic lives in the `authorized` callback above.
+
+**Real issues found and fixed (see `DECISIONS.md`):** Auth.js's documented JWT type-augmentation
+target (`next-auth/jwt`) doesn't actually type-check against this beta version's callback
+signatures — traced it to `@auth/core/jwt` instead; `npx auth secret` resolves to an unrelated npm
+package; the `lastLoginAt` update was originally fire-and-forget and silently never completed,
+fixed by awaiting it.
+
+**Verification:** `tsc --noEmit`, `npm run lint`, `npm run build` all pass. Full auth flow tested
+against the running dev server and real seeded users via direct HTTP calls to the Auth.js
+endpoints (which `loginAction`/`logoutAction` thinly wrap): wrong password and unknown email both
+rejected with the same generic error (no user-enumeration signal); correct admin login succeeds,
+sets a session cookie, and updates `lastLoginAt` in the database; `/dashboard` shows the correct
+signed-in name/role for both an admin and a housekeeping account; a housekeeping session hitting
+`/staff` is redirected to `/dashboard` while an admin session is allowed through (404s only because
+the page doesn't exist yet); an authenticated session visiting `/login` is redirected to
+`/dashboard`; sign-out clears the session cookie and subsequent `/dashboard` access redirects to
+`/login`.
+
+**Not done in this phase (by design):** no Playwright browser-level test of the login form itself
+yet (that's Phase 15) — verification here exercised the underlying Auth.js endpoints directly. No
+`/staff` or `/settings` pages exist yet (later phases); the role-only route list in
+`permissions.ts` is forward-looking infrastructure, demonstrated via the proxy redirect test above.

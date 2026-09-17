@@ -16,8 +16,12 @@ endpoint).
   `node_modules/next/dist/docs/` (or currently official docs) before use, each time they come up.
 - **Styling/UI:** Tailwind CSS v4 (CSS-based config, no `tailwind.config.js`) + shadcn/ui
   (Radix-based components copied into `src/components/ui`, not an installed black-box dependency).
-- **Auth:** Auth.js (NextAuth v5), Credentials provider, JWT sessions, role embedded in the
-  session. Introduced in Phase 3.
+- **Auth:** Auth.js (NextAuth v5, pinned `5.0.0-beta.32`), Credentials provider, JWT sessions,
+  role embedded in the session/token (`src/lib/auth.ts`). No adapter/DB tables — Credentials +
+  JWT doesn't persist sessions. `src/proxy.ts` (Next.js 16's `middleware.ts` successor) does
+  optimistic redirects only, via the `authorized` callback; `src/lib/session.ts`'s
+  `requireUser()`/`requireRole()` are the authoritative server-side check, per Next.js's own
+  recommended DAL pattern. Introduced in Phase 3.
 - **Database:** PostgreSQL + Prisma 7 (pinned exact version, not `@latest` — see `DECISIONS.md`).
   Local dev via `docker-compose.yml`; production via a hosted Postgres (Neon) on Vercel. Prisma
   7's default generator has no bundled query engine, so the client connects through an explicit

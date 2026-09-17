@@ -2,6 +2,32 @@
 
 Short entries for decisions worth remembering the "why" of. Newest first.
 
+## 2026-09-17 — Auth.js `JWT` type augmentation must target `@auth/core/jwt`, not `next-auth/jwt`
+
+Auth.js's own TypeScript docs show augmenting `declare module "next-auth/jwt"` to add custom JWT
+fields. In the installed `next-auth@5.0.0-beta.32`, that doesn't type-check: `NextAuthConfig`'s
+`session`/`jwt` callbacks type their `token` parameter using `JWT` imported directly from
+`@auth/core/jwt` (confirmed in `node_modules/@auth/core/index.d.ts`), and `next-auth/jwt.d.ts`'s
+`export * from "@auth/core/jwt"` re-export doesn't make TS treat augmentations to the two module
+specifiers as the same interface. `src/types/next-auth.d.ts` augments `@auth/core/jwt` instead —
+found by reproducing the actual type error and tracing the import, not by assumption.
+
+## 2026-09-17 — `npx auth secret` is the wrong package
+
+Running it installs and runs an unrelated npm package (`auth@1.7.5`, the "Better Auth" CLI) and
+suggests a `BETTER_AUTH_SECRET` var — not an Auth.js/next-auth tool at all, despite the plausible
+name. It didn't write anything to `.env` (just printed a suggestion), so no harm done, but the
+`.env.example` comment referencing it (carried over from Phase 1 scaffolding) was wrong and is now
+fixed to generate the secret via `node -e "console.log(require('crypto').randomBytes(32)...)"`.
+
+## 2026-09-17 — `lastLoginAt` update in `authorize()` must be awaited, not fire-and-forget
+
+Initially written as `void prisma.user.update(...)` to avoid adding latency to sign-in. In testing
+against the real dev server, the write never actually landed — the request/response cycle
+completed before the un-awaited promise finished. Changed to `await`; verified via `psql` that
+`lastLoginAt` now updates correctly. A single indexed update is a few ms; correctness matters more
+here than that.
+
 ## 2026-09-16 — Prisma 7.10.0 pinned; `prisma` CLI's `latest` tag is actually an 8.0 RC
 
 `npm view prisma dist-tags` showed `prisma`'s `latest` tag pointing at `8.0.0-rc.15` while
