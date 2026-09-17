@@ -28,13 +28,21 @@ docker compose up -d
 # 3. Copy env vars and fill in secrets
 cp .env.example .env
 
-# 4. Run the dev server
+# 4. Apply the database schema and load demo data
+npm run db:migrate
+npm run db:seed
+
+# 5. Run the dev server
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Database setup (Prisma migrate + seed) is introduced in Phase 2 — see the development log.
+Demo accounts (all use password `Password123!`): `admin@hotel.test` (Admin),
+`receptionist@hotel.test` / `bob.reception@hotel.test` (Receptionist),
+`housekeeping@hotel.test` / `dan.housekeeping@hotel.test` (Housekeeping). Note: sign-in isn't
+implemented until Phase 3 — these accounts exist in the database now so they're ready to use once
+auth lands.
 
 ## Scripts
 
@@ -42,3 +50,6 @@ Database setup (Prisma migrate + seed) is introduced in Phase 2 — see the deve
 - `npm run build` / `npm run start` — production build/serve
 - `npm run lint` — ESLint
 - `npm run format` / `npm run format:check` — Prettier
+- `npm run db:migrate` — apply Prisma migrations (dev)
+- `npm run db:seed` — load demo data
+- `npm run db:studio` — browse the database in Prisma Studio

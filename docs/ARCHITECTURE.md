@@ -18,8 +18,11 @@ endpoint).
   (Radix-based components copied into `src/components/ui`, not an installed black-box dependency).
 - **Auth:** Auth.js (NextAuth v5), Credentials provider, JWT sessions, role embedded in the
   session. Introduced in Phase 3.
-- **Database:** PostgreSQL + Prisma. Local dev via `docker-compose.yml`; production via a hosted
-  Postgres (Neon) on Vercel. Introduced in Phase 2.
+- **Database:** PostgreSQL + Prisma 7 (pinned exact version, not `@latest` — see `DECISIONS.md`).
+  Local dev via `docker-compose.yml`; production via a hosted Postgres (Neon) on Vercel. Prisma
+  7's default generator has no bundled query engine, so the client connects through an explicit
+  `@prisma/adapter-pg` driver adapter (`src/lib/prisma.ts`) rather than a bare `new PrismaClient()`.
+  Introduced in Phase 2.
 - **AI assistant:** direct `@anthropic-ai/sdk` usage with a read-only tool set — the model never
   has a tool that writes to the database. Any mutating request becomes a structured "proposed
   action" that the UI shows as a confirmation dialog; confirming it calls the same Server Action
