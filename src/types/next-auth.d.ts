@@ -1,5 +1,5 @@
 import type { DefaultSession } from "next-auth";
-import type { Role } from "@/generated/prisma/client";
+import type { Role } from "@/generated/prisma/enums";
 
 // Adds our custom `role`/`id` fields to Auth.js's Session/User/JWT types.
 // Pattern per Auth.js v5 docs: https://authjs.dev/getting-started/typescript

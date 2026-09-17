@@ -2,6 +2,21 @@
 
 Short entries for decisions worth remembering the "why" of. Newest first.
 
+## 2026-09-18 — Client Components must import Prisma enums from `enums.ts`, never `client.ts`
+
+`src/lib/permissions.ts` did `import { Role } from "@/generated/prisma/client"` (a real value import,
+used as `Role.ADMIN`). That module also exports the actual `PrismaClient` runtime and imports
+`node:process`/`node:path`/`node:url` plus the query engine at its top. Once `app-sidebar.tsx` (a
+Client Component) started importing `can()` from `permissions.ts` for nav filtering, Turbopack
+tried to bundle that whole module for the browser and hard-failed: `TurbopackInternalError: the
+chunking context (unknown) does not support external modules (request: node:module)`. Fixed by
+importing `Role` from `@/generated/prisma/enums` instead — a plain-data module the generated
+client's own comments say is safe to import directly, with no Node/runtime dependencies. Updated
+`permissions.ts`, `session.ts`, `app-sidebar.tsx`, and `types/next-auth.d.ts` (the last two were
+`import type`, already erased, but changed for consistency). Rule going forward: any code reachable
+from a Client Component may only pull enums from `enums.ts`; only server-only files may import
+`@/generated/prisma/client` directly.
+
 ## 2026-09-17 — Auth.js `JWT` type augmentation must target `@auth/core/jwt`, not `next-auth/jwt`
 
 Auth.js's own TypeScript docs show augmenting `declare module "next-auth/jwt"` to add custom JWT
