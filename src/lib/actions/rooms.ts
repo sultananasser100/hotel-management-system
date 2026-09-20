@@ -5,6 +5,8 @@ import { Prisma } from "@/generated/prisma/client";
 import { RoomStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
+import { todayDateOnly } from "@/lib/dashboard";
+import { OCCUPYING_STATUSES } from "@/lib/reservation-constants";
 
 export type RoomFormState =
   { status: "idle" } | { status: "error"; error: string } | { status: "success" };
@@ -88,6 +90,18 @@ export async function updateRoomAction(
   const parsed = parseRoomInput(formData);
   if ("error" in parsed) return parsed;
 
+  // A reservation's room must stay a room of the reservation's room type.
+  const existing = await prisma.room.findUnique({ where: { id }, select: { roomTypeId: true } });
+  if (existing && existing.roomTypeId !== parsed.roomTypeId) {
+    const open = await countOpenReservations(id);
+    if (open > 0) {
+      return {
+        status: "error",
+        error: `Cannot change the room type: ${describeOpenReservations(open)} assigned to this room.`,
+      };
+    }
+  }
+
   try {
     await prisma.room.update({ where: { id }, data: parsed });
   } catch (error) {
@@ -103,8 +117,29 @@ export async function updateRoomAction(
 
 export type RoomActionResult = { error: string } | undefined;
 
+// Reservations that still hold this room: active status and not yet checked out by date.
+function countOpenReservations(roomId: string) {
+  return prisma.reservation.count({
+    where: {
+      roomId,
+      status: { in: OCCUPYING_STATUSES },
+      checkOutDate: { gte: todayDateOnly() },
+    },
+  });
+}
+
+function describeOpenReservations(count: number): string {
+  return `${count} upcoming or current reservation${count === 1 ? " is" : "s are"}`;
+}
+
 export async function deleteRoomAction(id: string): Promise<RoomActionResult> {
   await requirePermission("rooms", "manage");
+
+  const open = await countOpenReservations(id);
+  if (open > 0) {
+    return { error: `Cannot delete: ${describeOpenReservations(open)} assigned to this room.` };
+  }
+
   await prisma.room.update({ where: { id }, data: { isActive: false } });
   revalidatePath("/rooms");
   return undefined;

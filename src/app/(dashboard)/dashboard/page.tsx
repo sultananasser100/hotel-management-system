@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/session";
+import { can } from "@/lib/permissions";
 import { getDashboardData } from "@/lib/dashboard";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { OccupancyOverview } from "@/components/dashboard/occupancy-overview";
@@ -10,6 +11,7 @@ import { RecentActivity } from "@/components/dashboard/recent-activity";
 export default async function DashboardPage() {
   const user = await requireUser();
   const data = await getDashboardData();
+  const canViewReservations = can(user.role, "reservations", "view");
 
   return (
     <div className="flex flex-col gap-6">
@@ -34,8 +36,11 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ArrivalsList arrivals={data.todaysArrivals} />
-        <DeparturesList departures={data.todaysDepartures} />
+        <ArrivalsList arrivals={data.todaysArrivals} linkToReservations={canViewReservations} />
+        <DeparturesList
+          departures={data.todaysDepartures}
+          linkToReservations={canViewReservations}
+        />
       </div>
 
       <RecentActivity entries={data.recentActivity} />

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { LogOut } from "lucide-react";
 import type { ArrivalDeparture } from "@/lib/dashboard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,7 +12,13 @@ import {
 } from "@/components/ui/table";
 import { ReservationStatusBadge } from "@/components/dashboard/reservation-status-badge";
 
-export function DeparturesList({ departures }: { departures: ArrivalDeparture[] }) {
+export function DeparturesList({
+  departures,
+  linkToReservations = false,
+}: {
+  departures: ArrivalDeparture[];
+  linkToReservations?: boolean;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -36,7 +43,15 @@ export function DeparturesList({ departures }: { departures: ArrivalDeparture[] 
             <TableBody>
               {departures.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.guestName}</TableCell>
+                  <TableCell className="font-medium">
+                    {linkToReservations ? (
+                      <Link href={`/reservations/${r.id}`} className="hover:underline">
+                        {r.guestName}
+                      </Link>
+                    ) : (
+                      r.guestName
+                    )}
+                  </TableCell>
                   <TableCell>{r.roomNumber ?? "Unassigned"}</TableCell>
                   <TableCell>
                     <ReservationStatusBadge status={r.status} />

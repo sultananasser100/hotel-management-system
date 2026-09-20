@@ -6,8 +6,11 @@ import { RelativeTime } from "@/components/dashboard/relative-time";
 const ACTION_LABEL: Record<string, string> = {
   CHECK_IN: "checked in",
   CHECK_OUT: "checked out",
-  CREATE_RESERVATION: "created a reservation for",
-  CANCEL_RESERVATION: "cancelled a reservation for",
+  CREATE_RESERVATION: "created a",
+  UPDATE_RESERVATION: "updated a",
+  CONFIRM_RESERVATION: "confirmed a",
+  NO_SHOW_RESERVATION: "marked a no-show",
+  CANCEL_RESERVATION: "cancelled a",
   COMPLETE_TASK: "completed a task on",
 };
 

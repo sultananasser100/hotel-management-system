@@ -6,6 +6,7 @@ import { ReservationStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { ID_DOCUMENT_TYPES } from "@/lib/guest-constants";
+import { COUNTRY_SET } from "@/lib/countries";
 
 export type GuestFormState =
   { status: "idle" } | { status: "error"; error: string } | { status: "success" };
@@ -29,8 +30,10 @@ function field(formData: FormData, name: string): string {
   return String(formData.get(name) ?? "").trim();
 }
 
+// `existingNationality` lets an edit keep a legacy free-text value that isn't in the list.
 function parseGuestInput(
   formData: FormData,
+  existingNationality: string | null = null,
 ): ParsedGuestInput | { status: "error"; error: string } {
   const firstName = field(formData, "firstName");
   const lastName = field(formData, "lastName");
@@ -63,7 +66,9 @@ function parseGuestInput(
     return fail("Provide both the ID document type and number, or neither.");
   }
   if (idDocumentNumber.length > 50) return fail("ID document number is too long.");
-  if (nationality.length > 100) return fail("Nationality must be 100 characters or fewer.");
+  if (nationality && !COUNTRY_SET.has(nationality) && nationality !== existingNationality) {
+    return fail("Select a nationality from the list.");
+  }
   if (address.length > 300) return fail("Address must be 300 characters or fewer.");
   if (notes.length > 1000) return fail("Notes must be 1000 characters or fewer.");
 
@@ -104,7 +109,8 @@ export async function updateGuestAction(
   const id = field(formData, "id");
   if (!id) return { status: "error", error: "Missing guest id." };
 
-  const parsed = parseGuestInput(formData);
+  const existing = await prisma.guest.findUnique({ where: { id }, select: { nationality: true } });
+  const parsed = parseGuestInput(formData, existing?.nationality ?? null);
   if ("error" in parsed) return parsed;
 
   try {

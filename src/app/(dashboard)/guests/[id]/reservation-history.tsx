@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -12,7 +13,7 @@ import { ReservationStatusBadge } from "@/components/dashboard/reservation-statu
 import { formatCurrency, formatDateOnly } from "@/lib/format";
 import type { GuestHistoryItem } from "@/lib/guests";
 
-// Read-only on purpose: reservation pages and actions arrive in Phase 8.
+// Read-only: reservations are created and changed from the Reservations pages.
 export function ReservationHistory({ history }: { history: GuestHistoryItem[] }) {
   return (
     <Card>
@@ -44,7 +45,11 @@ export function ReservationHistory({ history }: { history: GuestHistoryItem[] })
             <TableBody>
               {history.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.confirmationCode}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/reservations/${r.id}`} className="hover:underline">
+                      {r.confirmationCode}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col">
                       <span>{r.roomTypeName}</span>
