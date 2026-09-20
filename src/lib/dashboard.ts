@@ -27,7 +27,7 @@ const ARRIVAL_DEPARTURE_STATUSES: ReservationStatus[] = [
   ReservationStatus.CHECKED_IN,
 ];
 
-function todayDateOnly(): Date {
+export function todayDateOnly(): Date {
   // checkInDate/checkOutDate are Postgres `date` columns (no time/timezone).
   // Matches prisma/seed.ts's daysFromNow() convention (UTC-midnight of the
   // current UTC calendar date) so "today" lines up with how those columns
