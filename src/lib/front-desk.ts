@@ -1,10 +1,7 @@
 import type { HousekeepingStatus, RoomStatus } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
-import {
-  PaymentStatus,
-  ReservationStatus,
-  RoomStatus as RoomStatusValues,
-} from "@/generated/prisma/enums";
+import { ReservationStatus, RoomStatus as RoomStatusValues } from "@/generated/prisma/enums";
+import { summarizePayments } from "@/lib/payment-balance";
 import { prisma } from "@/lib/prisma";
 import { checkAvailability } from "@/lib/availability";
 import { todayDateOnly } from "@/lib/dashboard";
@@ -137,12 +134,19 @@ export type FrontDeskInfo = {
     totalAmount: number;
     paidAmount: number;
     balance: number;
+    // Paid beyond the total (overpaid); shown as information only.
+    credit: number;
+    // Whether the current user may record payments (controls the "Record a payment" link).
+    canRecordPayment: boolean;
   } | null;
   // Explains why neither action applies (other statuses).
   unavailableReason: string | null;
 };
 
-export async function getFrontDeskInfo(id: string): Promise<FrontDeskInfo | null> {
+export async function getFrontDeskInfo(
+  id: string,
+  access: { canRecordPayment: boolean },
+): Promise<FrontDeskInfo | null> {
   const r = await prisma.reservation.findUnique({
     where: { id },
     include: { guest: true, roomType: true, room: true, payments: true },
@@ -167,19 +171,22 @@ export async function getFrontDeskInfo(id: string): Promise<FrontDeskInfo | null
   };
 
   if (r.status === ReservationStatus.CHECKED_IN) {
-    const totalAmount = Number(r.totalAmount);
-    const paidAmount = r.payments
-      .filter((p) => p.status === PaymentStatus.COMPLETED)
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const payment = summarizePayments({
+      status: r.status,
+      totalAmount: Number(r.totalAmount),
+      payments: r.payments.map((p) => ({ amount: Number(p.amount), status: p.status })),
+    });
     return {
       reservation,
       checkIn: null,
       checkOut: {
         departure: departureNote(r.checkOutDate, today),
         roomNumber: r.room?.roomNumber ?? null,
-        totalAmount,
-        paidAmount,
-        balance: Math.max(0, totalAmount - paidAmount),
+        totalAmount: payment.total,
+        paidAmount: payment.paid,
+        balance: payment.balance,
+        credit: payment.credit,
+        canRecordPayment: access.canRecordPayment,
       },
       unavailableReason: null,
     };

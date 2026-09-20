@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { checkOutReservationAction } from "@/lib/actions/front-desk";
 import { formatCurrency } from "@/lib/format";
@@ -90,7 +91,23 @@ export function CheckOutDialog({ reservationId, confirmationCode, onClose }: Che
                 <p className="rounded-lg bg-muted p-3">
                   Outstanding balance of {formatCurrency(checkOut.balance)} (paid{" "}
                   {formatCurrency(checkOut.paidAmount)} of {formatCurrency(checkOut.totalAmount)}).
-                  You can still check the guest out; payments are handled separately.
+                  You can still check the guest out.
+                  {checkOut.canRecordPayment && (
+                    <>
+                      {" "}
+                      <Link
+                        href={`/reservations/${reservationId}#payments`}
+                        onClick={onClose}
+                        className="font-medium underline underline-offset-2"
+                      >
+                        Record a payment
+                      </Link>
+                    </>
+                  )}
+                </p>
+              ) : checkOut.credit > 0 ? (
+                <p className="rounded-lg bg-muted p-3">
+                  Paid in full, with a credit of {formatCurrency(checkOut.credit)} (overpaid).
                 </p>
               ) : (
                 <p className="text-muted-foreground">

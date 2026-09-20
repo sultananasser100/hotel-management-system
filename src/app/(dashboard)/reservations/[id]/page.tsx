@@ -6,19 +6,12 @@ import { can } from "@/lib/permissions";
 import { getReservationById } from "@/lib/reservations";
 import { formatCurrency } from "@/lib/format";
 import { SOURCE_LABEL } from "@/lib/reservation-constants";
-import { PaymentStatus } from "@/generated/prisma/enums";
+import { Role } from "@/generated/prisma/enums";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ReservationStatusBadge } from "@/components/dashboard/reservation-status-badge";
 import { ReservationActionsMenu } from "../reservation-actions-menu";
+import { PaymentsSection } from "./payments-section";
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   return (
@@ -28,20 +21,6 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
     </div>
   );
 }
-
-const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
-  PENDING: "Pending",
-  COMPLETED: "Completed",
-  FAILED: "Failed",
-  REFUNDED: "Refunded",
-};
-
-const PAYMENT_METHOD_LABEL: Record<string, string> = {
-  CASH: "Cash",
-  CARD: "Card",
-  BANK_TRANSFER: "Bank transfer",
-  ONLINE: "Online",
-};
 
 export default async function ReservationDetailPage({
   params,
@@ -57,6 +36,8 @@ export default async function ReservationDetailPage({
   const canManage = can(user.role, "reservations", "manage");
   const canViewGuests = can(user.role, "guests", "view");
   const canFrontDesk = can(user.role, "checkInOut", "manage");
+  const canViewPayments = can(user.role, "payments", "view");
+  const canManagePayments = can(user.role, "payments", "manage");
   const guestsLabel = `${reservation.adults} adult${reservation.adults === 1 ? "" : "s"}${
     reservation.children > 0
       ? `, ${reservation.children} child${reservation.children === 1 ? "" : "ren"}`
@@ -166,44 +147,17 @@ export default async function ReservationDetailPage({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Payments</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <InfoRow label="Total" value={formatCurrency(reservation.totalAmount)} />
-            <InfoRow label="Paid" value={formatCurrency(reservation.paidAmount)} />
-            <InfoRow label="Balance" value={formatCurrency(reservation.balance)} />
-          </dl>
-          {reservation.payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No payments recorded.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reservation.payments.map((payment) => (
-                  <TableRow key={payment.id}>
-                    <TableCell>{payment.dateLabel}</TableCell>
-                    <TableCell>{PAYMENT_METHOD_LABEL[payment.method] ?? payment.method}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline">{PAYMENT_STATUS_LABEL[payment.status]}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{formatCurrency(payment.amount)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {canViewPayments && (
+        <PaymentsSection
+          reservationId={reservation.id}
+          confirmationCode={reservation.confirmationCode}
+          reservationStatus={reservation.status}
+          summary={reservation.paymentSummary}
+          payments={reservation.payments}
+          canManage={canManagePayments}
+          isAdmin={user.role === Role.ADMIN}
+        />
+      )}
 
       <p className="text-xs text-muted-foreground">
         Created by {reservation.createdByName} on {reservation.createdAtLabel} · Last updated{" "}

@@ -10,6 +10,10 @@ const ACTION_LABEL: Record<string, string> = {
   UPDATE_RESERVATION: "updated a",
   CONFIRM_RESERVATION: "confirmed a",
   NO_SHOW_RESERVATION: "marked a no-show",
+  RECORD_PAYMENT: "recorded a",
+  RECEIVE_PAYMENT: "received a",
+  VOID_PAYMENT: "voided a",
+  REFUND_PAYMENT: "refunded a",
   CANCEL_RESERVATION: "cancelled a",
   COMPLETE_TASK: "completed a task on",
 };

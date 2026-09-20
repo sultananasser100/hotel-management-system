@@ -1,17 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import {
-  HousekeepingStatus,
-  PaymentStatus,
-  ReservationStatus,
-  RoomStatus,
-} from "@/generated/prisma/enums";
+import { HousekeepingStatus, ReservationStatus, RoomStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { todayDateOnly } from "@/lib/dashboard";
 import { formatCurrency } from "@/lib/format";
 import { getCheckInRoomState } from "@/lib/front-desk";
+import { getPaymentSummary } from "@/lib/payments";
 import { checkInBlockers } from "@/lib/front-desk-rules";
 import { ID_DOCUMENT_TYPES } from "@/lib/guest-constants";
 import { UNBOOKABLE_ROOM_STATUSES } from "@/lib/reservation-constants";
@@ -220,12 +216,8 @@ export async function checkOutReservationAction(reservationId: string): Promise<
         }
       }
 
-      // Warning only (Phase 10 owns payments): record any outstanding balance.
-      const paid = await tx.payment.aggregate({
-        where: { reservationId, status: PaymentStatus.COMPLETED },
-        _sum: { amount: true },
-      });
-      const balanceDue = Math.max(0, Number(r.totalAmount) - Number(paid._sum.amount ?? 0));
+      // Warning only: checkout never requires payment. Uses the shared balance calculation.
+      const balanceDue = (await getPaymentSummary(tx, reservationId))?.balance ?? 0;
 
       await tx.activityLog.create({
         data: {

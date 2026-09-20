@@ -14,7 +14,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const info = await getFrontDeskInfo(id);
+  const info = await getFrontDeskInfo(id, {
+    canRecordPayment: can(session.user.role, "payments", "manage"),
+  });
   if (!info) {
     return Response.json({ error: "Reservation not found." }, { status: 404 });
   }

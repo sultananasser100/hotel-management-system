@@ -1,9 +1,11 @@
 import type { Prisma } from "@/generated/prisma/client";
-import { PaymentStatus, ReservationStatus } from "@/generated/prisma/enums";
+import { ReservationStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { todayDateOnly } from "@/lib/dashboard";
 import { formatDateOnly, formatTimestamp } from "@/lib/format";
 import { checkInTimingBlocker } from "@/lib/front-desk-rules";
+import { getPaidCentsByReservation } from "@/lib/payments";
+import { summarizeCents, summarizePayments } from "@/lib/payment-balance";
 import { EDITABLE_STATUSES, RESERVATIONS_PAGE_SIZE } from "@/lib/reservation-constants";
 import { nightsBetween, toDateInputValue } from "@/lib/reservation-utils";
 
@@ -54,8 +56,15 @@ export async function getReservations(filters: ReservationFilters) {
     take: RESERVATIONS_PAGE_SIZE,
   });
 
+  const paidCents = await getPaidCentsByReservation(rows.map((r) => r.id));
+
   const today = todayDateOnly();
   const items = rows.map((r) => {
+    const payment = summarizeCents({
+      status: r.status,
+      totalAmount: Number(r.totalAmount),
+      paidCents: paidCents.get(r.id) ?? 0,
+    });
     const isConfirmed = r.status === ReservationStatus.CONFIRMED;
     const checkInBlockedReason = isConfirmed
       ? checkInTimingBlocker(r.status, r.checkInDate, r.checkOutDate, today)
@@ -72,6 +81,9 @@ export async function getReservations(filters: ReservationFilters) {
       checkOutLabel: formatDateOnly(r.checkOutDate),
       nights: nightsBetween(r.checkInDate, r.checkOutDate),
       totalAmount: Number(r.totalAmount),
+      balance: payment.balance,
+      credit: payment.credit,
+      paymentState: payment.state,
       canEdit: EDITABLE_STATUSES.includes(r.status),
       canMarkNoShow: r.status === ReservationStatus.CONFIRMED && r.checkInDate <= today,
       canCheckIn: isConfirmed && checkInBlockedReason === null,
@@ -93,7 +105,10 @@ export async function getReservationById(id: string) {
       roomType: true,
       room: true,
       createdBy: { select: { name: true } },
-      payments: { orderBy: { createdAt: "asc" } },
+      payments: {
+        orderBy: { createdAt: "asc" },
+        include: { createdBy: { select: { name: true } } },
+      },
     },
   });
   if (!r) return null;
@@ -112,11 +127,15 @@ export async function getReservationById(id: string) {
     amount: Number(p.amount),
     method: p.method,
     status: p.status,
-    dateLabel: formatDateOnly(p.paidAt ?? p.createdAt),
+    reference: p.transactionRef,
+    dateLabel: formatTimestamp(p.paidAt ?? p.createdAt),
+    recordedBy: p.createdBy.name,
   }));
-  const paidAmount = payments
-    .filter((p) => p.status === PaymentStatus.COMPLETED)
-    .reduce((sum, p) => sum + p.amount, 0);
+  const paymentSummary = summarizePayments({
+    status: r.status,
+    totalAmount,
+    payments,
+  });
 
   return {
     id: r.id,
@@ -150,8 +169,7 @@ export async function getReservationById(id: string) {
     createdAtLabel: formatDateOnly(r.createdAt),
     updatedAtLabel: formatDateOnly(r.updatedAt),
     payments,
-    paidAmount,
-    balance: Math.max(0, totalAmount - paidAmount),
+    paymentSummary,
     canEdit: EDITABLE_STATUSES.includes(r.status),
     canMarkNoShow: r.status === ReservationStatus.CONFIRMED && r.checkInDate <= today,
     canCheckIn: detailCheckInBlockedReason === null && r.status === ReservationStatus.CONFIRMED,

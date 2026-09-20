@@ -18,6 +18,7 @@ import { ReservationActionsMenu } from "./reservation-actions-menu";
 import { ReservationFilters } from "./reservation-filters";
 import { RESERVATIONS_PAGE_SIZE } from "@/lib/reservation-constants";
 import { formatCurrency } from "@/lib/format";
+import type { PaymentState } from "@/lib/payment-balance";
 import type { ReservationListItem } from "@/lib/reservations";
 
 type ReservationsTableProps = {
@@ -30,6 +31,22 @@ type ReservationsTableProps = {
   canFrontDesk: boolean;
   canViewGuests: boolean;
 };
+
+function BalanceCell({
+  balance,
+  credit,
+  state,
+}: {
+  balance: number;
+  credit: number;
+  state: PaymentState;
+}) {
+  if (balance > 0) return <span className="font-medium">{formatCurrency(balance)}</span>;
+  if (credit > 0) {
+    return <span className="text-muted-foreground">Credit {formatCurrency(credit)}</span>;
+  }
+  return <span className="text-muted-foreground">{state === "paid" ? "Paid" : "—"}</span>;
+}
 
 export function ReservationsTable({
   reservations,
@@ -90,6 +107,7 @@ export function ReservationsTable({
                   <TableHead className="text-center">Nights</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
                   {(canManage || canFrontDesk) && (
                     <TableHead className="text-right">Actions</TableHead>
                   )}
@@ -127,6 +145,9 @@ export function ReservationsTable({
                       <ReservationStatusBadge status={r.status} />
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(r.totalAmount)}</TableCell>
+                    <TableCell className="text-right">
+                      <BalanceCell balance={r.balance} credit={r.credit} state={r.paymentState} />
+                    </TableCell>
                     {(canManage || canFrontDesk) && (
                       <TableCell className="text-right">
                         <ReservationActionsMenu
