@@ -1,23 +1,22 @@
 import * as React from "react";
 
 const MOBILE_BREAKPOINT = 768;
+const QUERY = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
 
+function subscribe(onChange: () => void) {
+  const mql = window.matchMedia(QUERY);
+  mql.addEventListener("change", onChange);
+  return () => mql.removeEventListener("change", onChange);
+}
+
+function getSnapshot() {
+  return window.matchMedia(QUERY).matches;
+}
+
+// The server has no window, so it (and the first hydration render) uses
+// `false`; useSyncExternalStore then switches to the real value right after
+// hydration. Reading window in a useState initializer instead made the first
+// client render differ from the server HTML on narrow screens (hydration mismatch).
 export function useIsMobile() {
-  // Lazy initializer instead of setState-in-effect (flagged by
-  // react-hooks/set-state-in-effect) — window is guarded for SSR, where this
-  // just defaults to false until the effect below runs on the client.
-  const [isMobile, setIsMobile] = React.useState<boolean>(() =>
-    typeof window !== "undefined" ? window.innerWidth < MOBILE_BREAKPOINT : false,
-  );
-
-  React.useEffect(() => {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
-    const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
-    };
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
-
-  return isMobile;
+  return React.useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
