@@ -56,6 +56,7 @@ export default async function ReservationDetailPage({
 
   const canManage = can(user.role, "reservations", "manage");
   const canViewGuests = can(user.role, "guests", "view");
+  const canFrontDesk = can(user.role, "checkInOut", "manage");
   const guestsLabel = `${reservation.adults} adult${reservation.adults === 1 ? "" : "s"}${
     reservation.children > 0
       ? `, ${reservation.children} child${reservation.children === 1 ? "" : "ren"}`
@@ -79,7 +80,14 @@ export default async function ReservationDetailPage({
             </h1>
             <ReservationStatusBadge status={reservation.status} />
           </div>
-          {canManage && <ReservationActionsMenu reservation={reservation} variant="button" />}
+          {(canManage || canFrontDesk) && (
+            <ReservationActionsMenu
+              reservation={reservation}
+              canManage={canManage}
+              canFrontDesk={canFrontDesk}
+              variant="button"
+            />
+          )}
         </div>
       </div>
 

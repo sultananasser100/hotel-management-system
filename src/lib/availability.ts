@@ -30,7 +30,7 @@ export async function checkAvailability(db: Db, params: AvailabilityParams) {
       isActive: true,
       status: { notIn: UNBOOKABLE_ROOM_STATUSES },
     },
-    select: { id: true, roomNumber: true, floor: true },
+    select: { id: true, roomNumber: true, floor: true, housekeepingStatus: true },
     orderBy: [{ floor: "asc" }, { roomNumber: "asc" }],
   });
 

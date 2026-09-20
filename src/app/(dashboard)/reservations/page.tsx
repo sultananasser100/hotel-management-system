@@ -55,6 +55,7 @@ export default async function ReservationsPage({
           to: to ? toRaw : "",
         }}
         canManage={can(user.role, "reservations", "manage")}
+        canFrontDesk={can(user.role, "checkInOut", "manage")}
         canViewGuests={can(user.role, "guests", "view")}
       />
     </div>

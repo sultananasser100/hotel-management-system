@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { MoreHorizontal } from "lucide-react";
@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -21,6 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CheckInDialog } from "@/components/front-desk/check-in-dialog";
+import { CheckOutDialog } from "@/components/front-desk/check-out-dialog";
 import {
   cancelReservationAction,
   confirmReservationAction,
@@ -74,19 +77,38 @@ type ReservationActionsMenuProps = {
     status: ReservationStatus;
     canEdit: boolean;
     canMarkNoShow: boolean;
+    canCheckIn: boolean;
+    checkInBlockedReason: string | null;
+    canCheckOut: boolean;
   };
+  // Phase 8 actions (edit / confirm / cancel / no-show) need `reservations` manage.
+  canManage: boolean;
+  // Check in / check out need `checkInOut` manage.
+  canFrontDesk: boolean;
   variant?: "icon" | "button";
 };
 
 export function ReservationActionsMenu({
   reservation,
+  canManage,
+  canFrontDesk,
   variant = "icon",
 }: ReservationActionsMenuProps) {
   const [action, setAction] = useState<StatusAction | null>(null);
+  const [frontDesk, setFrontDesk] = useState<"in" | "out" | null>(null);
   const [pending, startTransition] = useTransition();
+  const closeFrontDesk = useCallback(() => setFrontDesk(null), []);
 
-  const canConfirm = reservation.status === ReservationStatus.PENDING;
-  if (!reservation.canEdit && !reservation.canMarkNoShow) return null;
+  const showEdit = canManage && reservation.canEdit;
+  const showConfirm = canManage && reservation.status === ReservationStatus.PENDING;
+  const showNoShow = canManage && reservation.canMarkNoShow;
+  const showCancel = canManage && reservation.canEdit;
+  const showCheckIn = canFrontDesk && reservation.status === ReservationStatus.CONFIRMED;
+  const showCheckOut = canFrontDesk && reservation.canCheckOut;
+  const showFrontDesk = showCheckIn || showCheckOut;
+  const showManage = showEdit || showConfirm || showNoShow || showCancel;
+
+  if (!showFrontDesk && !showManage) return null;
 
   const copy = ACTIONS[action ?? "confirm"];
 
@@ -120,19 +142,37 @@ export function ReservationActionsMenu({
             </Button>
           )}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {reservation.canEdit && (
+        <DropdownMenuContent align="end" className="min-w-44">
+          {showCheckIn && (
+            <DropdownMenuItem
+              disabled={!reservation.canCheckIn}
+              onSelect={() => setFrontDesk("in")}
+              className="flex-col items-start gap-0"
+            >
+              <span>Check in</span>
+              {!reservation.canCheckIn && reservation.checkInBlockedReason && (
+                <span className="text-xs text-muted-foreground">
+                  {reservation.checkInBlockedReason}
+                </span>
+              )}
+            </DropdownMenuItem>
+          )}
+          {showCheckOut && (
+            <DropdownMenuItem onSelect={() => setFrontDesk("out")}>Check out</DropdownMenuItem>
+          )}
+          {showFrontDesk && showManage && <DropdownMenuSeparator />}
+          {showEdit && (
             <DropdownMenuItem asChild>
               <Link href={`/reservations/${reservation.id}/edit`}>Edit</Link>
             </DropdownMenuItem>
           )}
-          {canConfirm && (
+          {showConfirm && (
             <DropdownMenuItem onSelect={() => setAction("confirm")}>Confirm</DropdownMenuItem>
           )}
-          {reservation.canMarkNoShow && (
+          {showNoShow && (
             <DropdownMenuItem onSelect={() => setAction("noShow")}>Mark no-show</DropdownMenuItem>
           )}
-          {reservation.canEdit && (
+          {showCancel && (
             <DropdownMenuItem variant="destructive" onSelect={() => setAction("cancel")}>
               Cancel reservation
             </DropdownMenuItem>
@@ -165,6 +205,21 @@ export function ReservationActionsMenu({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {frontDesk === "in" && (
+        <CheckInDialog
+          reservationId={reservation.id}
+          confirmationCode={reservation.confirmationCode}
+          onClose={closeFrontDesk}
+        />
+      )}
+      {frontDesk === "out" && (
+        <CheckOutDialog
+          reservationId={reservation.id}
+          confirmationCode={reservation.confirmationCode}
+          onClose={closeFrontDesk}
+        />
+      )}
     </>
   );
 }
