@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@/generated/prisma/client";
-import { RoomStatus } from "@/generated/prisma/enums";
+import { ReservationStatus, RoomStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { todayDateOnly } from "@/lib/dashboard";
@@ -91,7 +91,28 @@ export async function updateRoomAction(
   if ("error" in parsed) return parsed;
 
   // A reservation's room must stay a room of the reservation's room type.
-  const existing = await prisma.room.findUnique({ where: { id }, select: { roomTypeId: true } });
+  const existing = await prisma.room.findUnique({
+    where: { id },
+    select: { roomTypeId: true, status: true },
+  });
+
+  // While a guest is checked in, check-in/check-out own this room's status. Leaving it
+  // unchanged (or correcting it to OCCUPIED) is fine; any other manual change is not.
+  if (
+    existing &&
+    parsed.status !== existing.status &&
+    parsed.status !== RoomStatus.OCCUPIED &&
+    (await prisma.reservation.count({
+      where: { roomId: id, status: ReservationStatus.CHECKED_IN },
+    })) > 0
+  ) {
+    return {
+      status: "error",
+      error:
+        "This room has an in-house guest, so its status can't be changed manually. Check the guest out first.",
+    };
+  }
+
   if (existing && existing.roomTypeId !== parsed.roomTypeId) {
     const open = await countOpenReservations(id);
     if (open > 0) {

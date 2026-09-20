@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { todayDateOnly } from "@/lib/dashboard";
 import { checkAvailability } from "@/lib/availability";
+import { lockRoomTypes } from "@/lib/room-type-lock";
 import { EDITABLE_STATUSES, INITIAL_STATUSES, MAX_STAY_NIGHTS } from "@/lib/reservation-constants";
 import { calculateTotal, nightsBetween, parseDateOnly } from "@/lib/reservation-utils";
 
@@ -72,15 +73,6 @@ function parseInput(formData: FormData): ReservationInput {
     children,
     source: source as ReservationSource,
   };
-}
-
-// Serializes concurrent bookings of the same room type: whoever holds the lock
-// checks availability and writes before the next one can check. (A database
-// exclusion constraint would be the stronger guarantee — deferred to hardening.)
-async function lockRoomTypes(tx: Tx, ids: string[]) {
-  for (const id of [...new Set(ids)].sort()) {
-    await tx.$queryRaw`SELECT "id" FROM "RoomType" WHERE "id" = ${id} FOR UPDATE`;
-  }
 }
 
 async function assertGuestActive(tx: Tx, guestId: string) {

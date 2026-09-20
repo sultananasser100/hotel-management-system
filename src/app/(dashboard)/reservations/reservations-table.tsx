@@ -27,6 +27,7 @@ type ReservationsTableProps = {
   totalPages: number;
   filters: { q: string; status: string; from: string; to: string };
   canManage: boolean;
+  canFrontDesk: boolean;
   canViewGuests: boolean;
 };
 
@@ -37,6 +38,7 @@ export function ReservationsTable({
   totalPages,
   filters,
   canManage,
+  canFrontDesk,
   canViewGuests,
 }: ReservationsTableProps) {
   const hasFilters = Boolean(filters.q || filters.status || filters.from || filters.to);
@@ -88,7 +90,9 @@ export function ReservationsTable({
                   <TableHead className="text-center">Nights</TableHead>
                   <TableHead className="text-center">Status</TableHead>
                   <TableHead className="text-right">Total</TableHead>
-                  {canManage && <TableHead className="text-right">Actions</TableHead>}
+                  {(canManage || canFrontDesk) && (
+                    <TableHead className="text-right">Actions</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -123,9 +127,13 @@ export function ReservationsTable({
                       <ReservationStatusBadge status={r.status} />
                     </TableCell>
                     <TableCell className="text-right">{formatCurrency(r.totalAmount)}</TableCell>
-                    {canManage && (
+                    {(canManage || canFrontDesk) && (
                       <TableCell className="text-right">
-                        <ReservationActionsMenu reservation={r} />
+                        <ReservationActionsMenu
+                          reservation={r}
+                          canManage={canManage}
+                          canFrontDesk={canFrontDesk}
+                        />
                       </TableCell>
                     )}
                   </TableRow>

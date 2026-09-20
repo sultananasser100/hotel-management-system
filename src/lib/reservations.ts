@@ -2,7 +2,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { PaymentStatus, ReservationStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { todayDateOnly } from "@/lib/dashboard";
-import { formatDateOnly } from "@/lib/format";
+import { formatDateOnly, formatTimestamp } from "@/lib/format";
+import { checkInTimingBlocker } from "@/lib/front-desk-rules";
 import { EDITABLE_STATUSES, RESERVATIONS_PAGE_SIZE } from "@/lib/reservation-constants";
 import { nightsBetween, toDateInputValue } from "@/lib/reservation-utils";
 
@@ -54,21 +55,30 @@ export async function getReservations(filters: ReservationFilters) {
   });
 
   const today = todayDateOnly();
-  const items = rows.map((r) => ({
-    id: r.id,
-    confirmationCode: r.confirmationCode,
-    status: r.status,
-    guestId: r.guest.id,
-    guestName: `${r.guest.firstName} ${r.guest.lastName}`,
-    roomTypeName: r.roomType.name,
-    roomNumber: r.room?.roomNumber ?? null,
-    checkInLabel: formatDateOnly(r.checkInDate),
-    checkOutLabel: formatDateOnly(r.checkOutDate),
-    nights: nightsBetween(r.checkInDate, r.checkOutDate),
-    totalAmount: Number(r.totalAmount),
-    canEdit: EDITABLE_STATUSES.includes(r.status),
-    canMarkNoShow: r.status === ReservationStatus.CONFIRMED && r.checkInDate <= today,
-  }));
+  const items = rows.map((r) => {
+    const isConfirmed = r.status === ReservationStatus.CONFIRMED;
+    const checkInBlockedReason = isConfirmed
+      ? checkInTimingBlocker(r.status, r.checkInDate, r.checkOutDate, today)
+      : null;
+    return {
+      id: r.id,
+      confirmationCode: r.confirmationCode,
+      status: r.status,
+      guestId: r.guest.id,
+      guestName: `${r.guest.firstName} ${r.guest.lastName}`,
+      roomTypeName: r.roomType.name,
+      roomNumber: r.room?.roomNumber ?? null,
+      checkInLabel: formatDateOnly(r.checkInDate),
+      checkOutLabel: formatDateOnly(r.checkOutDate),
+      nights: nightsBetween(r.checkInDate, r.checkOutDate),
+      totalAmount: Number(r.totalAmount),
+      canEdit: EDITABLE_STATUSES.includes(r.status),
+      canMarkNoShow: r.status === ReservationStatus.CONFIRMED && r.checkInDate <= today,
+      canCheckIn: isConfirmed && checkInBlockedReason === null,
+      checkInBlockedReason,
+      canCheckOut: r.status === ReservationStatus.CHECKED_IN,
+    };
+  });
 
   return { items, total, page, totalPages };
 }
@@ -90,6 +100,12 @@ export async function getReservationById(id: string) {
 
   const today = todayDateOnly();
   const nights = nightsBetween(r.checkInDate, r.checkOutDate);
+  const detailCheckInBlockedReason = checkInTimingBlocker(
+    r.status,
+    r.checkInDate,
+    r.checkOutDate,
+    today,
+  );
   const totalAmount = Number(r.totalAmount);
   const payments = r.payments.map((p) => ({
     id: p.id,
@@ -116,8 +132,8 @@ export async function getReservationById(id: string) {
     nights,
     totalAmount,
     effectiveRate: nights > 0 ? totalAmount / nights : 0,
-    actualCheckInLabel: r.actualCheckInAt ? formatDateOnly(r.actualCheckInAt) : null,
-    actualCheckOutLabel: r.actualCheckOutAt ? formatDateOnly(r.actualCheckOutAt) : null,
+    actualCheckInLabel: r.actualCheckInAt ? formatTimestamp(r.actualCheckInAt) : null,
+    actualCheckOutLabel: r.actualCheckOutAt ? formatTimestamp(r.actualCheckOutAt) : null,
     guest: {
       id: r.guest.id,
       name: `${r.guest.firstName} ${r.guest.lastName}`,
@@ -138,6 +154,10 @@ export async function getReservationById(id: string) {
     balance: Math.max(0, totalAmount - paidAmount),
     canEdit: EDITABLE_STATUSES.includes(r.status),
     canMarkNoShow: r.status === ReservationStatus.CONFIRMED && r.checkInDate <= today,
+    canCheckIn: detailCheckInBlockedReason === null && r.status === ReservationStatus.CONFIRMED,
+    checkInBlockedReason:
+      r.status === ReservationStatus.CONFIRMED ? detailCheckInBlockedReason : null,
+    canCheckOut: r.status === ReservationStatus.CHECKED_IN,
   };
 }
 
