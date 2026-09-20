@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { requirePermission } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { getGuestById } from "@/lib/guests";
 import { formatDateOnly } from "@/lib/format";
+import { displayNationality } from "@/lib/countries";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GuestActions } from "./guest-actions";
 import { ReservationHistory } from "./reservation-history";
@@ -33,6 +35,7 @@ export default async function GuestDetailPage({ params }: { params: Promise<{ id
   const { guest, history, summary } = data;
   const canManage = can(user.role, "guests", "manage");
   const canViewReservations = can(user.role, "reservations", "view");
+  const canBook = can(user.role, "reservations", "manage") && guest.isActive;
 
   const tiles = [
     { label: "Total reservations", value: String(summary.totalReservations) },
@@ -61,7 +64,17 @@ export default async function GuestDetailPage({ params }: { params: Promise<{ id
             </h1>
             {!guest.isActive && <Badge variant="secondary">Inactive</Badge>}
           </div>
-          {canManage && <GuestActions guest={guest} />}
+          <div className="flex items-center gap-2">
+            {canBook && (
+              <Button asChild size="sm">
+                <Link href={`/reservations/new?guestId=${guest.id}`}>
+                  <Plus className="size-4" />
+                  New reservation
+                </Link>
+              </Button>
+            )}
+            {canManage && <GuestActions guest={guest} />}
+          </div>
         </div>
       </div>
 
@@ -88,7 +101,7 @@ export default async function GuestDetailPage({ params }: { params: Promise<{ id
               <InfoRow label="Email" value={guest.email} />
               <InfoRow label="Phone" value={guest.phone} />
               <InfoRow label="Address" value={guest.address} />
-              <InfoRow label="Nationality" value={guest.nationality} />
+              <InfoRow label="Nationality" value={displayNationality(guest.nationality)} />
             </dl>
           </CardContent>
         </Card>

@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createGuestAction, updateGuestAction, type GuestFormState } from "@/lib/actions/guests";
 import { ID_DOCUMENT_TYPES } from "@/lib/guest-constants";
+import { COUNTRY_NAMES, COUNTRY_SET, displayNationality } from "@/lib/countries";
+import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +30,32 @@ import type { GuestDetail } from "@/lib/guests";
 
 const initialState: GuestFormState = { status: "idle" };
 
+function nationalityOptions(current: string): ComboboxOption[] {
+  const options: ComboboxOption[] = [{ value: "", label: "Not provided" }];
+  // Keep an unrecognized legacy value selectable so editing a guest never drops it.
+  if (current && !COUNTRY_SET.has(current)) options.push({ value: current, label: current });
+  return options.concat(COUNTRY_NAMES.map((name) => ({ value: name, label: name })));
+}
+
+// Holds its own state so it resets whenever the dialog content unmounts.
+function NationalityField({ initial }: { initial: string }) {
+  const [nationality, setNationality] = useState(initial);
+  return (
+    <>
+      <input type="hidden" name="nationality" value={nationality} />
+      <Combobox
+        id="nationality"
+        options={nationalityOptions(initial)}
+        value={nationality}
+        onValueChange={setNationality}
+        placeholder="Not provided"
+        searchPlaceholder="Search countries..."
+        emptyText="No matching country."
+      />
+    </>
+  );
+}
+
 type GuestFormDialogProps = {
   guest?: GuestDetail;
   open: boolean;
@@ -36,6 +64,7 @@ type GuestFormDialogProps = {
 
 export function GuestFormDialog({ guest, open, onOpenChange }: GuestFormDialogProps) {
   const isEdit = Boolean(guest);
+  const initialNationality = displayNationality(guest?.nationality) ?? "";
   const [state, formAction, pending] = useActionState(
     isEdit ? updateGuestAction : createGuestAction,
     initialState,
@@ -125,7 +154,7 @@ export function GuestFormDialog({ guest, open, onOpenChange }: GuestFormDialogPr
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="nationality">Nationality</Label>
-              <Input id="nationality" name="nationality" defaultValue={guest?.nationality ?? ""} />
+              <NationalityField initial={initialNationality} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="address">Address</Label>
