@@ -143,6 +143,16 @@ async function main() {
     where: { roomNumber: "104" },
     data: { housekeepingStatus: HousekeepingStatus.INSPECTED },
   });
+  // Rooms 101 and 102 have open cleaning tasks below (PENDING / IN_PROGRESS), so their
+  // housekeeping status must match: DIRTY <-> PENDING, IN_PROGRESS <-> IN_PROGRESS.
+  await prisma.room.update({
+    where: { roomNumber: "101" },
+    data: { housekeepingStatus: HousekeepingStatus.DIRTY },
+  });
+  await prisma.room.update({
+    where: { roomNumber: "102" },
+    data: { housekeepingStatus: HousekeepingStatus.IN_PROGRESS },
+  });
 
   const roomByNumber = (n: string) => rooms.find((r) => r.roomNumber === n)!;
 

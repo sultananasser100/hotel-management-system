@@ -14,6 +14,11 @@ const ACTION_LABEL: Record<string, string> = {
   RECEIVE_PAYMENT: "received a",
   VOID_PAYMENT: "voided a",
   REFUND_PAYMENT: "refunded a",
+  START_CLEANING: "started cleaning a",
+  COMPLETE_CLEANING: "finished cleaning a",
+  INSPECT_ROOM: "inspected a",
+  MARK_ROOM_DIRTY: "marked dirty a",
+  ASSIGN_HOUSEKEEPER: "assigned a housekeeper to a",
   CANCEL_RESERVATION: "cancelled a",
   COMPLETE_TASK: "completed a task on",
 };

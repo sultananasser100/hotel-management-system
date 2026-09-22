@@ -8,6 +8,7 @@ import { todayDateOnly } from "@/lib/dashboard";
 import { formatCurrency } from "@/lib/format";
 import { getCheckInRoomState } from "@/lib/front-desk";
 import { getPaymentSummary } from "@/lib/payments";
+import { ensureOpenCleaningTask } from "@/lib/housekeeping";
 import { checkInBlockers } from "@/lib/front-desk-rules";
 import { ID_DOCUMENT_TYPES } from "@/lib/guest-constants";
 import { UNBOOKABLE_ROOM_STATUSES } from "@/lib/reservation-constants";
@@ -31,6 +32,7 @@ function revalidateFrontDesk(reservationId: string, guestId: string) {
   revalidatePath(`/reservations/${reservationId}`);
   revalidatePath("/dashboard");
   revalidatePath("/rooms");
+  revalidatePath("/housekeeping");
   revalidatePath(`/guests/${guestId}`);
 }
 
@@ -213,6 +215,8 @@ export async function checkOutReservationAction(reservationId: string): Promise<
                 : { status: RoomStatus.AVAILABLE }),
             },
           });
+          // Queue the cleaning: a pending CLEANING task unless one is already open.
+          await ensureOpenCleaningTask(tx, r.roomId);
         }
       }
 
