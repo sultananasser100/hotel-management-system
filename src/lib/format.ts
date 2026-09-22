@@ -29,3 +29,8 @@ export function formatTimestamp(date: Date): string {
 export function formatCurrency(amount: number): string {
   return `$${amount.toFixed(2)}`;
 }
+
+// A 0..1 ratio (e.g. 0.625) to a whole-percent label ("63%").
+export function formatPercent(ratio: number): string {
+  return `${Math.round(ratio * 100)}%`;
+}

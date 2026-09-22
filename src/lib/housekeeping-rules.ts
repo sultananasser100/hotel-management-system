@@ -2,6 +2,7 @@ import {
   HousekeepingStatus,
   HousekeepingTaskPriority,
   HousekeepingTaskStatus,
+  HousekeepingTaskType,
 } from "@/generated/prisma/enums";
 
 export const HOUSEKEEPING_PAGE_SIZE = 20;
@@ -19,6 +20,13 @@ export const PRIORITY_LABEL: Record<HousekeepingTaskPriority, string> = {
   MEDIUM: "Medium",
   HIGH: "High",
   URGENT: "Urgent",
+};
+
+export const HOUSEKEEPING_TASK_TYPE_LABEL: Record<HousekeepingTaskType, string> = {
+  CLEANING: "Cleaning",
+  INSPECTION: "Inspection",
+  MAINTENANCE: "Maintenance",
+  TURNDOWN: "Turndown",
 };
 
 // The room's housekeeping status is the visible truth; its CLEANING task mirrors it:
