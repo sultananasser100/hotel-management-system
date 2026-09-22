@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { PaymentMethod, PaymentStatus, Role } from "@/generated/prisma/enums";
+import { NotificationType, PaymentMethod, PaymentStatus, Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { formatCurrency } from "@/lib/format";
 import { getPaymentSummary } from "@/lib/payments";
+import { notifyRole } from "@/lib/notifications";
 import {
   centsToDecimalString,
   looksLikeCardNumber,
@@ -117,6 +118,14 @@ export async function recordPaymentAction(
         },
       });
 
+      await notifyRole(tx, Role.ADMIN, {
+        type: NotificationType.PAYMENT,
+        title: "Payment recorded",
+        message: `${formatCurrency(amount.cents / 100)} recorded for ${reservation.confirmationCode}.`,
+        relatedEntityType: "Reservation",
+        relatedEntityId: reservationId,
+      });
+
       return `Recorded ${formatCurrency(amount.cents / 100)} for ${reservation.confirmationCode}.`;
     });
 
@@ -207,6 +216,16 @@ async function transitionPayment(
           },
         },
       });
+
+      if (transition.to === PaymentStatus.COMPLETED) {
+        await notifyRole(tx, Role.ADMIN, {
+          type: NotificationType.PAYMENT,
+          title: "Payment recorded",
+          message: `${formatCurrency(Number(payment.amount))} recorded for ${payment.reservation.confirmationCode}.`,
+          relatedEntityType: "Reservation",
+          relatedEntityId: payment.reservationId,
+        });
+      }
 
       return {
         reservationId: payment.reservationId,

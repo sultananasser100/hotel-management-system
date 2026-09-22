@@ -6,6 +6,7 @@ import {
   HousekeepingTaskPriority,
   HousekeepingTaskStatus,
   HousekeepingTaskType,
+  NotificationType,
   Role,
 } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +18,7 @@ import {
   findTransition,
 } from "@/lib/housekeeping-rules";
 import { lockRoom } from "@/lib/room-lock";
+import { notifyUser } from "@/lib/notifications";
 
 export type HousekeepingActionResult =
   { status: "error"; error: string } | { status: "success"; message: string };
@@ -300,6 +302,17 @@ export async function assignHousekeeperAction(
           metadata: { room: room.roomNumber, assignee: assigneeName, priority },
         },
       });
+
+      if (assigneeId) {
+        const urgent = priority === HousekeepingTaskPriority.URGENT;
+        await notifyUser(tx, assigneeId, {
+          type: NotificationType.HOUSEKEEPING,
+          title: "Cleaning task assigned to you",
+          message: `You were assigned to clean room ${room.roomNumber}${urgent ? " (urgent)" : ""}.`,
+          relatedEntityType: "Room",
+          relatedEntityId: roomId,
+        });
+      }
 
       return `Room ${room.roomNumber}: ${assigneeName ? `assigned to ${assigneeName}` : "unassigned"}.`;
     });

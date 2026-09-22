@@ -3,11 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { Prisma } from "@/generated/prisma/client";
-import { ReservationSource, ReservationStatus } from "@/generated/prisma/enums";
+import { NotificationType, ReservationSource, ReservationStatus, Role } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { todayDateOnly } from "@/lib/dashboard";
 import { checkAvailability } from "@/lib/availability";
+import { notifyRole } from "@/lib/notifications";
 import { lockRoomTypes } from "@/lib/room-type-lock";
 import { EDITABLE_STATUSES, INITIAL_STATUSES, MAX_STAY_NIGHTS } from "@/lib/reservation-constants";
 import { calculateTotal, nightsBetween, parseDateOnly } from "@/lib/reservation-utils";
@@ -342,6 +343,25 @@ async function transition(
           metadata: { confirmationCode: existing.confirmationCode },
         },
       });
+
+      if (to === ReservationStatus.CANCELLED) {
+        await notifyRole(tx, Role.ADMIN, {
+          type: NotificationType.RESERVATION,
+          title: "Reservation cancelled",
+          message: `Reservation ${existing.confirmationCode} was cancelled.`,
+          relatedEntityType: "Reservation",
+          relatedEntityId: id,
+        });
+      } else if (to === ReservationStatus.NO_SHOW) {
+        await notifyRole(tx, Role.ADMIN, {
+          type: NotificationType.RESERVATION,
+          title: "Reservation marked no-show",
+          message: `Reservation ${existing.confirmationCode} was marked as a no-show.`,
+          relatedEntityType: "Reservation",
+          relatedEntityId: id,
+        });
+      }
+
       return existing.guestId;
     });
   } catch (error) {
