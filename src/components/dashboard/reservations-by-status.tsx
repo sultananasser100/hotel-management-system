@@ -4,9 +4,12 @@ import { ReservationStatusBadge } from "@/components/dashboard/reservation-statu
 
 type ReservationsByStatusProps = {
   breakdown: { status: ReservationStatus; count: number }[];
+  // Defaults to the dashboard's all-time framing; callers filtering to a
+  // date range (e.g. Reports) should pass a description that says so.
+  description?: string;
 };
 
-export function ReservationsByStatus({ breakdown }: ReservationsByStatusProps) {
+export function ReservationsByStatus({ breakdown, description }: ReservationsByStatusProps) {
   const total = breakdown.reduce((sum, b) => sum + b.count, 0);
   const max = Math.max(1, ...breakdown.map((b) => b.count));
 
@@ -14,7 +17,7 @@ export function ReservationsByStatus({ breakdown }: ReservationsByStatusProps) {
     <Card>
       <CardHeader>
         <CardTitle>Reservations by status</CardTitle>
-        <CardDescription>{total} reservations on record</CardDescription>
+        <CardDescription>{description ?? `${total} reservations on record`}</CardDescription>
       </CardHeader>
       <CardContent>
         {total === 0 ? (
