@@ -1,7 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { HousekeepingStatus, ReservationStatus, RoomStatus } from "@/generated/prisma/enums";
+import {
+  HousekeepingStatus,
+  NotificationType,
+  ReservationStatus,
+  RoomStatus,
+  Role,
+} from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { todayDateOnly } from "@/lib/dashboard";
@@ -9,6 +15,7 @@ import { formatCurrency } from "@/lib/format";
 import { getCheckInRoomState } from "@/lib/front-desk";
 import { getPaymentSummary } from "@/lib/payments";
 import { ensureOpenCleaningTask } from "@/lib/housekeeping";
+import { notifyRole } from "@/lib/notifications";
 import { checkInBlockers } from "@/lib/front-desk-rules";
 import { ID_DOCUMENT_TYPES } from "@/lib/guest-constants";
 import { UNBOOKABLE_ROOM_STATUSES } from "@/lib/reservation-constants";
@@ -217,6 +224,14 @@ export async function checkOutReservationAction(reservationId: string): Promise<
           });
           // Queue the cleaning: a pending CLEANING task unless one is already open.
           await ensureOpenCleaningTask(tx, r.roomId);
+
+          await notifyRole(tx, Role.HOUSEKEEPING, {
+            type: NotificationType.HOUSEKEEPING,
+            title: "Room needs cleaning",
+            message: `Room ${r.room.roomNumber} was marked dirty after checkout.`,
+            relatedEntityType: "Room",
+            relatedEntityId: r.roomId,
+          });
         }
       }
 
