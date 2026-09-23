@@ -23,7 +23,8 @@ export type Resource =
   | "staff"
   | "reports"
   | "notifications"
-  | "settings";
+  | "settings"
+  | "aiAssistant";
 
 export type Action = "view" | "manage";
 
@@ -44,6 +45,7 @@ const MATRIX: Record<Resource, Partial<Record<Role, Action[]>>> = {
   reports: { ADMIN: ["view"], RECEPTIONIST: ["view"] },
   notifications: { ADMIN: ["view"], RECEPTIONIST: ["view"], HOUSEKEEPING: ["view"] },
   settings: { ADMIN: ["view", "manage"] },
+  aiAssistant: { ADMIN: ["view"], RECEPTIONIST: ["view"] },
 };
 
 export function can(role: Role, resource: Resource, action: Action = "view"): boolean {

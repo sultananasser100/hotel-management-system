@@ -12,6 +12,7 @@ import {
   BarChart3,
   Bell,
   Settings,
+  Bot,
 } from "lucide-react";
 import type { Resource } from "@/lib/permissions";
 
@@ -44,5 +45,6 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Staff", href: "/staff", icon: UserCog, resource: "staff" },
   { title: "Reports", href: "/reports", icon: BarChart3, resource: "reports" },
   { title: "Notifications", href: "/notifications", icon: Bell, resource: "notifications" },
+  { title: "AI Assistant", href: "/assistant", icon: Bot, resource: "aiAssistant" },
   { title: "Settings", href: "/settings", icon: Settings, resource: "settings" },
 ];
