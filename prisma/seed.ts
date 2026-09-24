@@ -11,6 +11,9 @@ import bcrypt from "bcryptjs";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+// Deterministic demo data: this password is public (documented in README.md).
+const DEMO_PASSWORD = "Harborview-Demo-2026!";
+
 function daysFromNow(days: number): Date {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
@@ -29,7 +32,8 @@ async function main() {
   console.log("Seeding database...");
 
   // --- Users (one row per role, plus one extra housekeeping staffer) ---
-  const password = await bcrypt.hash("Password123!", 10);
+  // All accounts share the demo password; only the admin account is publicly documented.
+  const password = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   const [admin, receptionistAlice, receptionistBob, housekeeperCarla, housekeeperDan] =
     await Promise.all(
@@ -495,7 +499,7 @@ async function main() {
   }
 
   // --- Housekeeping tasks ---
-  await prisma.housekeepingTask.createMany({
+  const housekeepingTasks = await prisma.housekeepingTask.createManyAndReturn({
     data: [
       {
         roomId: roomByNumber("101").id,
@@ -545,6 +549,9 @@ async function main() {
       },
     ],
   });
+  const completedTask302 = housekeepingTasks.find(
+    (task) => task.roomId === roomByNumber("302").id && task.status === "COMPLETED",
+  )!;
 
   // --- Notifications ---
   await prisma.notification.createMany({
@@ -601,19 +608,14 @@ async function main() {
         userId: housekeeperCarla.id,
         action: "COMPLETE_TASK",
         entityType: "HousekeepingTask",
-        entityId: roomByNumber("302").id,
+        entityId: completedTask302.id,
         metadata: { room: "302" },
       },
     ],
   });
 
   console.log("Seed complete.");
-  console.log("Demo accounts (password for all: Password123!):");
-  console.log("  admin@hotel.test            (ADMIN)");
-  console.log("  receptionist@hotel.test     (RECEPTIONIST)");
-  console.log("  bob.reception@hotel.test    (RECEPTIONIST)");
-  console.log("  housekeeping@hotel.test     (HOUSEKEEPING)");
-  console.log("  dan.housekeeping@hotel.test (HOUSEKEEPING)");
+  console.log(`Demo account: ${admin.email} (ADMIN), password: ${DEMO_PASSWORD}`);
 }
 
 main()
