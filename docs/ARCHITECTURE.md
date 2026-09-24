@@ -29,8 +29,8 @@ through Route Handlers instead. Every Route Handler checks the session and `can(
   The role is read from the JWT, not re-checked against the database on each request, so a role
   change or deactivation takes effect at the user's next sign-in. Introduced in Phase 3.
 - **Database:** PostgreSQL + Prisma 7 (pinned exact version, not `@latest` — see `DECISIONS.md`).
-  Local dev via `docker-compose.yml`; production planned on a hosted Postgres (Neon) with the app
-  on Vercel (not yet deployed). Prisma 7's default generator has no bundled query engine, so the
+  Local dev via `docker-compose.yml`; production on a hosted Postgres (Neon) with the app
+  deployed on Vercel. Prisma 7's default generator has no bundled query engine, so the
   client connects through an explicit `@prisma/adapter-pg` driver adapter (`src/lib/prisma.ts`)
   rather than a bare `new PrismaClient()`. Connection URL and seed command live in
   `prisma7.config.ts`. The generated client (`src/generated/prisma`) is gitignored and produced by
