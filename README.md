@@ -126,8 +126,8 @@ automatically in development mode.
 
 ## Deployment
 
-**Status:** not yet deployed. The planned production setup is **Vercel** for the app and a hosted
-**PostgreSQL** database (Neon). Connection details will be documented once the database exists.
+**Status:** deployed. The app runs on **Vercel** with a hosted **PostgreSQL** database (Neon).
+Connection strings and other secrets live only in the Vercel project's environment settings.
 
 How it fits together:
 

@@ -329,9 +329,9 @@ claimed for these entries._
 - Model choice: `.env.example` records that `gemini-3.7-flash` returned frequent 503 "overloaded"
   errors on the free tier during testing and `gemini-3.5-flash` was more reliable.
 
-## Phase 15 — Production readiness & deployment (in progress)
+## Phase 15 — Production readiness & deployment
 
-**Goal:** prepare for the first deployment (Vercel + hosted PostgreSQL). Nothing is deployed yet.
+**Goal:** prepare for and complete the first deployment (Vercel + hosted PostgreSQL).
 
 **What was done so far:**
 
@@ -353,12 +353,23 @@ claimed for these entries._
   public demo account, and the seed prints only that account. Also fixed the seeded `COMPLETE_TASK`
   activity-log entry, which referenced room 302's id instead of the completed housekeeping task's
   id (tasks are now created with `createManyAndReturn`).
+- Deployment: migrations applied to the Neon production database, which was then seeded once; the
+  app deployed to Vercel.
 
 **Verification:** after deleting `src/generated/prisma` and `.next`, `npm ci` ran the new
 `postinstall` and regenerated the client from `prisma7.config.ts`; `npm run build` passed.
 `prisma generate` also succeeds with no `DATABASE_URL` set. `prisma migrate deploy` was confirmed
 to exist and read `prisma7.config.ts` (help output only — no migrations were run).
 
+**Production smoke test (manual):** passed. The Vercel production deployment is working and its
+environment variables are recognized; the Neon production database is connected and the seeded
+data is visible; login with the documented public demo account (`admin@hotel.test`) works.
+Dashboard, Rooms, Guests, Reservations, Check-in/Check-out, Payments, Housekeeping, Notifications,
+Reports, and the AI Hotel Assistant were each tested manually and worked; the AI Assistant
+successfully queried production hotel data. No real or private data was entered during testing.
+
 **Known issues, not addressed yet:** `npm run format:check` fails across the local checkout
-because files have CRLF line endings while Prettier expects LF; `npm ci` reports 4 high-severity
-dependency vulnerabilities (not yet investigated).
+because files have CRLF line endings while Prettier expects LF. `npm audit` reports 4
+high-severity findings; investigated: they are in the Prisma CLI / development dependency tree
+(`deepmerge-ts` via `@prisma/config`, and `mysql2`, both under `prisma`), do not affect the running
+application, and have no safe Prisma 7.x fix currently available.
