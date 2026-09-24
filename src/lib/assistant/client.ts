@@ -8,4 +8,5 @@ const apiKey = process.env.GEMINI_API_KEY;
 
 export const gemini = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-export const ASSISTANT_MODEL = process.env.GEMINI_MODEL || "gemini-3.7-flash";
+// Keep in sync with GEMINI_MODEL in .env.example.
+export const ASSISTANT_MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash";

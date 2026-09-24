@@ -4,8 +4,12 @@
 
 Next.js (App Router) is used as the full-stack framework — no separate API server. Server
 Components fetch data directly via Prisma; Server Actions handle form mutations; Route Handlers
-are used only where a real HTTP endpoint is required (Auth.js, the AI assistant's streaming
-endpoint).
+are used where a real HTTP endpoint is required: Auth.js (`api/auth/[...nextauth]`), the AI
+assistant's chat endpoint (`api/assistant/chat`, returns one JSON reply per request — not
+streamed), and a few read-only lookups that Client Components call while a dialog or form is open
+(`api/reservations/availability`, `api/guests/search`, `api/reservations/[id]/front-desk-info`,
+`api/housekeeping/rooms/[id]/history`) — Server Actions are dispatched one at a time, so reads go
+through Route Handlers instead. Every Route Handler checks the session and `can()` itself.
 
 ## Key decisions
 
@@ -21,16 +25,39 @@ endpoint).
   JWT doesn't persist sessions. `src/proxy.ts` (Next.js 16's `middleware.ts` successor) does
   optimistic redirects only, via the `authorized` callback; `src/lib/session.ts`'s
   `requireUser()`/`requireRole()` are the authoritative server-side check, per Next.js's own
-  recommended DAL pattern. Introduced in Phase 3.
+  recommended DAL pattern. The role matrix itself lives in `src/lib/permissions.ts` (`can()`).
+  The role is read from the JWT, not re-checked against the database on each request, so a role
+  change or deactivation takes effect at the user's next sign-in. Introduced in Phase 3.
 - **Database:** PostgreSQL + Prisma 7 (pinned exact version, not `@latest` — see `DECISIONS.md`).
-  Local dev via `docker-compose.yml`; production via a hosted Postgres (Neon) on Vercel. Prisma
-  7's default generator has no bundled query engine, so the client connects through an explicit
-  `@prisma/adapter-pg` driver adapter (`src/lib/prisma.ts`) rather than a bare `new PrismaClient()`.
-  Introduced in Phase 2.
-- **AI assistant:** direct `@anthropic-ai/sdk` usage with a read-only tool set — the model never
-  has a tool that writes to the database. Any mutating request becomes a structured "proposed
-  action" that the UI shows as a confirmation dialog; confirming it calls the same Server Action
-  the manual UI uses. Introduced in Phase 14.
+  Local dev via `docker-compose.yml`; production planned on a hosted Postgres (Neon) with the app
+  on Vercel (not yet deployed). Prisma 7's default generator has no bundled query engine, so the
+  client connects through an explicit `@prisma/adapter-pg` driver adapter (`src/lib/prisma.ts`)
+  rather than a bare `new PrismaClient()`. Connection URL and seed command live in
+  `prisma7.config.ts`. The generated client (`src/generated/prisma`) is gitignored and produced by
+  `prisma generate`, which runs on every `npm install` via `postinstall`. Migrations are applied
+  with `prisma migrate dev` locally and `prisma migrate deploy` (`npm run db:deploy`) in
+  production. Introduced in Phase 2.
+- **Data integrity under concurrency:** mutations run in Prisma transactions that take a
+  PostgreSQL row lock before validating and writing — per room type for bookings, check-ins and
+  check-outs (`room-type-lock.ts`), per reservation for payments (`reservation-lock.ts`), per room
+  for housekeeping (`room-lock.ts`). The lock ordering is chosen so these can't deadlock with each
+  other. A database exclusion constraint against double-booking is deferred to hardening.
+  Reservation, check-in/out, payment, and housekeeping changes write an `ActivityLog` row, and
+  notifications are created inside the same transaction
+  (`src/lib/notifications.ts`), so a rolled-back change never leaves a stray notification.
+- **AI assistant:** Google Gemini via `@google/genai`, configured by `GEMINI_API_KEY` and
+  `GEMINI_MODEL` (`src/lib/assistant/client.ts`, server-only). Available to ADMIN and RECEPTIONIST
+  (`aiAssistant` in the permission matrix). The browser posts the chat history to
+  `api/assistant/chat` (no server-side conversation storage); the route validates the session,
+  role, and message sizes, then `run-assistant.ts` runs a bounded function-calling loop (at most 5
+  model round trips, one retry on a 503) and returns the final text. The model can only call the
+  fixed tools in `src/lib/assistant/tools.ts`, each of which wraps an existing read function from
+  `src/lib/*` (dashboard, front desk, reservations, availability, rooms, housekeeping, guests,
+  payments, reports) and re-checks `can(role, resource, "view")` before running. **The assistant
+  is read-only**: no tool writes to the database, and there is no mechanism for the model to
+  propose or perform changes — for actions, it points the user to the relevant page. List results
+  are capped in size, and the guest tools exclude identity documents and free-text notes. Introduced in
+  Phase 14.
 - **Application shell:** shadcn's `sidebar` block (`src/components/ui/sidebar.tsx`) wrapping
   `src/app/(dashboard)/layout.tsx`; nav items (`src/lib/nav.ts`) are filtered with the same
   `can()` used everywhere else, and every page under `(dashboard)` also calls

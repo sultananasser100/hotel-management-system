@@ -172,3 +172,193 @@ server-reference manifest and invoking it directly — confirmed session cookie 
 **Not done in this phase (by design):** no actual Rooms/Guests/Reservations/etc. functionality —
 all 10 non-dashboard pages are placeholders per the approved scope. Theme toggle deferred to
 Phase 17 per the earlier decision.
+
+---
+
+_Phases 5–14 were written up retroactively during Phase 15, from the source code and commit
+history. Per-phase verification details weren't recorded in this log at the time, so none are
+claimed for these entries._
+
+## Phase 5 — Dashboard
+
+**Goal:** replace the welcome placeholder with a real hotel overview.
+
+**What was done:**
+
+- `src/lib/dashboard.ts` — `getDashboardData()`: room counts by status, reservation counts by
+  status, today's arrivals and departures (CONFIRMED or CHECKED_IN, so a guest who already checked
+  in today still appears), recent activity.
+- `src/components/dashboard/` — summary cards, occupancy overview (stacked bar built from plain
+  Tailwind divs), reservations-by-status, arrivals/departures lists, recent activity feed with
+  relative timestamps.
+
+## Phase 6 — Rooms & Room Types
+
+**Goal:** real room and room-type management in place of the placeholders.
+
+**What was done:**
+
+- `/room-types` and `/rooms` pages with tables and create/edit dialogs; ADMIN manages, other roles
+  with access view only (`roomTypes`/`rooms` in the permission matrix).
+- Server Actions in `src/lib/actions/room-types.ts` and `rooms.ts`. A room type can't be deleted
+  while rooms still use it (with a foreign-key safety net that never shows the raw database
+  error). Rooms are deactivated/restored rather than deleted, and deactivation is blocked while
+  upcoming or current reservations are assigned to the room.
+
+## Phase 7 — Guests
+
+**Goal:** guest directory and guest detail view.
+
+**What was done:**
+
+- `/guests` with search, pagination, and a create/edit dialog (nationality from a fixed country
+  list in `src/lib/countries.ts`); `/guests/[id]` detail page with reservation history.
+- Guests are never hard-deleted — reservations reference them (`ON DELETE RESTRICT`) and stay
+  history should be kept — so "delete" deactivates and can be restored.
+
+## Phase 8 — Reservations
+
+**Goal:** create, edit, and manage bookings with correct availability.
+
+**What was done:**
+
+- `/reservations` list (status, check-in date range, and text filters; pagination), detail page,
+  and a create/edit form with a guest picker (`api/guests/search`) and a live availability/price
+  check (`api/reservations/availability`).
+- `src/lib/availability.ts` — per-night availability for a room type: PENDING/CONFIRMED/CHECKED_IN
+  reservations hold a room; MAINTENANCE/OUT_OF_SERVICE and inactive rooms aren't bookable;
+  same-day turnover is allowed. Stays are capped at 30 nights.
+- Confirmation codes are sequential (`HV-1000`, …), with the unique index catching two bookings
+  racing for the same code.
+- Confirm / cancel / no-show actions; only PENDING and CONFIRMED reservations are editable.
+- Concurrent bookings of the same room type are serialized with a row lock taken inside the
+  transaction (`src/lib/room-type-lock.ts`). The stronger database exclusion constraint remains
+  deferred to hardening.
+
+## Phase 9 — Check-in / Check-out
+
+**Goal:** the front desk workflow.
+
+**What was done:**
+
+- `/checkin-checkout` front desk board: confirmed arrivals, pending (unconfirmed) arrivals, and
+  in-house guests, including how late an arrival or departure is.
+- Check-in and check-out dialogs, loading their data from `api/reservations/[id]/front-desk-info`.
+  Check-in enforces status and date rules (`src/lib/front-desk-rules.ts`), requires the guest's ID
+  document (captured at check-in if not already on file), and warns when the room isn't clean.
+- Check-out frees the room (never overwriting a manual MAINTENANCE/OUT_OF_SERVICE status), marks
+  it for housekeeping, queues a pending cleaning task, and warns — but doesn't block — on an
+  unpaid balance. Both take the same room-type lock as bookings.
+
+## Phase 10 — Payments
+
+**Goal:** payment recording and a reliable balance per reservation.
+
+**What was done:**
+
+- `src/lib/payment-balance.ts` — the single balance calculation, done in whole cents (states:
+  none, unpaid, partial, paid, overpaid, refundable).
+- Record-payment dialog in the reservation page's payments section (the check-out dialog links
+  to it when a balance is outstanding); `/payments` list with filters.
+- Mark a pending payment received; ADMIN-only void (stored as FAILED, excluded from the balance)
+  and refund. Payment rows are never deleted or edited.
+- Payment changes are serialized per reservation (`src/lib/reservation-lock.ts`), a lock that
+  can't deadlock with the room-type lock.
+
+## Phase 11 — Housekeeping
+
+**Goal:** a housekeeping board for cleaning status and task assignment.
+
+**What was done:**
+
+- `/housekeeping` board with summary counts and filters (status or "needs attention", floor,
+  assignee), plus a per-room history dialog (`api/housekeeping/rooms/[id]/history`).
+- Status changes keep the room's housekeeping status and its CLEANING task in step (DIRTY ↔
+  PENDING, IN_PROGRESS ↔ IN_PROGRESS, CLEAN ↔ COMPLETED, INSPECTED ↔ VERIFIED); whoever starts a
+  cleaning becomes its assignee. Housekeeper assignment for rooms with cleaning to do.
+- Changes are serialized per room (`src/lib/room-lock.ts`), which can't deadlock with bookings or
+  check-outs.
+
+## Phase 12 — Notifications
+
+**Goal:** in-app notifications for events staff need to act on.
+
+**What was done:**
+
+- `src/lib/notifications.ts` — `notifyRole()` / `notifyUser()`, called inside the originating
+  feature's transaction right after its `ActivityLog` write, so a rolled-back change never leaves
+  a stray notification.
+- Events: check-out → HOUSEKEEPING (room needs cleaning); housekeeper assignment → the assigned
+  user; payment recorded or marked received → ADMIN; reservation cancelled or marked no-show →
+  ADMIN.
+- Header notification bell (latest 10) and `/notifications` page (paginated); mark one or all as
+  read.
+
+## Phase 13 — Reports
+
+**Goal:** a reports dashboard over a selectable date range.
+
+**What was done:**
+
+- `src/lib/reports.ts` — revenue (received/refunded/outstanding, by method, trend), occupancy
+  (rate and trend), reservations (status breakdown, arrivals, departures), guests (totals, new vs
+  returning, nationality breakdown), and housekeeping (completed/open, by type, by priority).
+- `/reports` with a date-range filter defaulting to the last 30 days; time series switch from
+  daily to weekly buckets for ranges over 60 days.
+- Charts are built from plain Tailwind divs (`src/components/reports/bar-chart.tsx`) — no charting
+  library is installed.
+
+## Phase 14 — AI Hotel Assistant
+
+**Goal:** a read-only assistant that answers staff questions from live hotel data.
+
+**What was done:**
+
+- Google Gemini via `@google/genai` (`src/lib/assistant/client.ts`), configured by
+  `GEMINI_API_KEY` / `GEMINI_MODEL`. With no key, the assistant reports that it isn't configured
+  instead of failing.
+- `src/lib/assistant/tools.ts` — 11 read-only tools, each wrapping an existing `src/lib/*` read
+  function and re-checking `can(role, resource, "view")`; list results are capped, and guest tools
+  exclude identity documents and notes.
+- `src/lib/assistant/run-assistant.ts` — function-calling loop capped at 5 round trips, with one
+  retry on a Gemini 503. `src/lib/assistant/system-prompt.ts` restricts the model to tool-backed
+  answers and tells it to refuse actions.
+- `api/assistant/chat` Route Handler (session, role, and message-size validation; errors mapped
+  to user-facing messages) and the `/assistant` chat page, available to ADMIN and RECEPTIONIST.
+  Chat history lives only in the browser session.
+- Model choice: `.env.example` records that `gemini-3.7-flash` returned frequent 503 "overloaded"
+  errors on the free tier during testing and `gemini-3.5-flash` was more reliable.
+
+## Phase 15 — Production readiness & deployment (in progress)
+
+**Goal:** prepare for the first deployment (Vercel + hosted PostgreSQL). Nothing is deployed yet.
+
+**What was done so far:**
+
+- Production-readiness review of database, env vars, auth, Gemini, Next.js/Vercel compatibility,
+  security, and docs. Main blocker found: the generated Prisma Client (`src/generated/prisma`) is
+  gitignored and nothing regenerated it on a fresh install, so a Vercel build would fail.
+- Added `"postinstall": "prisma generate"` and `"db:deploy": "prisma migrate deploy"` to
+  `package.json`; `build` and `db:migrate` unchanged.
+- Config cleanup: removed obsolete Anthropic variables from the local `.env` and fixed its stale
+  `npx auth secret` comment; aligned the code's default `GEMINI_MODEL` with `.env.example`
+  (`gemini-3.5-flash`, the model already in use); clarified `.env.example`.
+- Documentation: rewrote `README.md` (current stack, features, setup, env vars, Prisma, scripts, a
+  deployment section) and corrected `ARCHITECTURE.md` (Gemini instead of Anthropic; removed the
+  never-implemented "proposed action" confirmation flow; documented the assistant's read-only tool
+  boundary, database/migrations setup, and locking).
+- Seed changes before seeding the hosted database: all 5 seeded accounts now use the demo password
+  `Harborview-Demo-2026!` (replacing Phase 2's `Password123!`, which databases seeded earlier still
+  have, since the seed never updates existing users). Only `admin@hotel.test` is documented as the
+  public demo account, and the seed prints only that account. Also fixed the seeded `COMPLETE_TASK`
+  activity-log entry, which referenced room 302's id instead of the completed housekeeping task's
+  id (tasks are now created with `createManyAndReturn`).
+
+**Verification:** after deleting `src/generated/prisma` and `.next`, `npm ci` ran the new
+`postinstall` and regenerated the client from `prisma7.config.ts`; `npm run build` passed.
+`prisma generate` also succeeds with no `DATABASE_URL` set. `prisma migrate deploy` was confirmed
+to exist and read `prisma7.config.ts` (help output only — no migrations were run).
+
+**Known issues, not addressed yet:** `npm run format:check` fails across the local checkout
+because files have CRLF line endings while Prettier expects LF; `npm ci` reports 4 high-severity
+dependency vulnerabilities (not yet investigated).
