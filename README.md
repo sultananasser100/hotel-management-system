@@ -5,6 +5,40 @@ and as an experiment in AI-assisted development with Claude Code. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and
 [docs/DEVELOPMENT_LOG.md](docs/DEVELOPMENT_LOG.md) for the phase-by-phase build record.
 
+## Live demo
+
+**[hotel-management-system-a9egby0pk-sultana-nasser.vercel.app](https://hotel-management-system-a9egby0pk-sultana-nasser.vercel.app/)**
+— hosted on Vercel with a Neon PostgreSQL database.
+
+Sign in with any of the demo accounts. They all share the same password, `Harborview-Demo-2026!`:
+
+| Role         | Email                     | Can access                                                                                                                                              |
+| ------------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin        | `admin@hotel.test`        | Everything, including room/room-type management, void/refund payments, Staff and Settings (placeholders)                                                |
+| Receptionist | `receptionist@hotel.test` | Guests, reservations, check-in/out, payments, reports and the AI assistant; view-only for rooms, room types and housekeeping                            |
+| Housekeeping | `housekeeping@hotel.test` | Dashboard, notifications and the housekeeping board (can update cleaning tasks); view-only for rooms. No guests, reservations, payments, reports or AI. |
+
+These are public demo accounts on shared demo data — please don't enter real or private
+information. Sign in as different roles to see how the sidebar and permissions change.
+
+### Quick tour
+
+1. **Dashboard** — room and reservation overview, today's arrivals and departures, recent activity.
+2. **Reservations → New reservation** — pick a guest, room type and dates; availability and price
+   are checked live. Save it, then confirm it from the reservation's page.
+3. **Check-in / Check-out** — check the guest in from the arrivals board, then check them out. Check-out
+   frees the room and queues a cleaning task.
+4. **Payments** — record a payment against the reservation and watch the running balance update.
+5. **Housekeeping** — the room you just checked out appears on the cleaning board; assign a
+   housekeeper and move it through its statuses. The **bell icon** in the header shows the related
+   notifications.
+6. **Reports** — revenue, occupancy, reservations, guests and housekeeping over a date range.
+7. **AI Assistant** — ask questions in plain English, for example _"What are today's arrivals and
+   departures?"_, _"Which rooms need cleaning right now?"_, _"What's this month's revenue so far?"_
+   or _"Are any Deluxe rooms available next weekend?"_. It is read-only and cannot change data.
+
+The **Staff** and **Settings** pages are placeholders.
+
 ## Tech stack
 
 - Next.js 16 (App Router) + TypeScript + React 19 — Server Components for reads, Server Actions for
